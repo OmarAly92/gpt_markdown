@@ -38,6 +38,7 @@ class GptMarkdown extends StatelessWidget {
     this.linkBuilder,
     this.maxLines,
     this.overflow,
+    this.highlightedText,
   });
 
   /// The direction of the text.
@@ -105,6 +106,8 @@ class GptMarkdown extends StatelessWidget {
   /// The image builder.
   final Widget Function(BuildContext, String imageUrl)? imageBuilder;
 
+  final String? highlightedText;
+
   /// A method to remove extra lines inside block LaTeX.
   String _removeExtraLinesInsideBlockLatex(String text) {
     return text.replaceAllMapped(
@@ -155,6 +158,7 @@ class GptMarkdown extends StatelessWidget {
           highlightBuilder: highlightBuilder,
           linkBuilder: linkBuilder,
           imageBuilder: imageBuilder,
+          highlightedText: highlightedText,
         ),
       ),
     );

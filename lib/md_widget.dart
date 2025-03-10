@@ -7,6 +7,7 @@ class MdWidget extends StatelessWidget {
   /// The expression to be displayed.
   final String exp;
 
+
   /// The configuration of the markdown widget.
   final GptMarkdownConfig config;
 
@@ -23,9 +24,9 @@ class MdWidget extends StatelessWidget {
         //       multiLine: true,
         //       dotAll: true,
         //     ), (match) {
-        //   //
-        //   String body = (match[1] ?? match[2])?.replaceAll("\n", " ") ?? "";
-        //   return "\\[$body\\]";
+
+          // String body = (match[1] ?? match[2])?.replaceAll("\n", " ") ?? "";
+          // return "\\[$body\\]";
         // }),
         config,
       ),

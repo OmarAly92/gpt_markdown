@@ -23,6 +23,7 @@ class GptMarkdownConfig {
     this.imageBuilder,
     this.maxLines,
     this.overflow,
+    this.highlightedText,
   });
 
   /// The direction of the text.
@@ -42,6 +43,8 @@ class GptMarkdownConfig {
 
   /// The LaTeX workaround.
   final String Function(String tex)? latexWorkaround;
+
+  final String? highlightedText;
 
   /// The LaTeX builder.
   final Widget Function(

@@ -73,8 +73,52 @@ abstract class MarkdownComponent {
         }
         return "";
       },
-      onNonMatch: (p0) {
-        spans.add(TextSpan(text: p0, style: config.style));
+      onNonMatch: (wholeText) {
+        if(config.highlightedText == null || config.highlightedText!.isEmpty ) {
+          spans.add(TextSpan(text: wholeText, style: config.style));
+          return "";
+        }
+        // Check if highlightedText is present in wholeText
+        if (
+            wholeText.contains(config.highlightedText ?? '')) {
+          // Split the wholeText into parts
+          final highlightedTextStart = wholeText.indexOf(
+            config.highlightedText ?? '',
+          );
+          final highlightedTextEnd =
+              highlightedTextStart + (config.highlightedText?.length ?? 0);
+
+          // Add the part before the highlighted text
+          spans.add(
+            TextSpan(
+              text: wholeText.substring(0, highlightedTextStart),
+              style: config.style,
+            ),
+          );
+
+          // Add the highlighted text with the highlighted style
+          spans.add(
+            TextSpan(
+              text: wholeText.substring(
+                highlightedTextStart,
+                highlightedTextEnd,
+              ),
+              style: config.style?.copyWith(
+                backgroundColor: Colors.yellow,
+                color: Colors.black,
+              ),
+            ),
+          );
+
+          // Add the part after the highlighted text
+          spans.add(
+            TextSpan(
+              text: wholeText.substring(highlightedTextEnd),
+              style: config.style,
+            ),
+          );
+        }
+
         return "";
       },
     );
@@ -89,6 +133,7 @@ abstract class MarkdownComponent {
   );
 
   RegExp get exp;
+
   bool get inline;
 }
 
@@ -143,6 +188,7 @@ abstract class BlockMd extends MarkdownComponent {
 class HTag extends BlockMd {
   @override
   String get expString => (r"(?<hash>#{1,6})\ (?<data>[^\n]+?)$");
+
   @override
   Widget build(
     BuildContext context,
@@ -192,6 +238,7 @@ class HTag extends BlockMd {
 class NewLines extends InlineMd {
   @override
   RegExp get exp => RegExp(r"\n\n+");
+
   @override
   InlineSpan span(
     BuildContext context,
@@ -209,6 +256,7 @@ class NewLines extends InlineMd {
 class HrLine extends BlockMd {
   @override
   String get expString => (r"(--)[-]+$");
+
   @override
   Widget build(
     BuildContext context,
@@ -228,6 +276,7 @@ class HrLine extends BlockMd {
 class CheckBoxMd extends BlockMd {
   @override
   String get expString => (r"\[(\x?)\]\ (\S[^\n]*?)$");
+
   get onLinkTab => null;
 
   @override
@@ -249,6 +298,7 @@ class CheckBoxMd extends BlockMd {
 class RadioButtonMd extends BlockMd {
   @override
   String get expString => (r"\((\x?)\)\ (\S[^\n]*)$");
+
   get onLinkTab => null;
 
   @override
@@ -270,6 +320,7 @@ class RadioButtonMd extends BlockMd {
 class IndentMd extends InlineMd {
   @override
   bool get inline => false;
+
   @override
   RegExp get exp =>
   // RegExp(r"(?<=\n\n)(\ +)(.+?)(?=\n\n)", dotAll: true, multiLine: true);
@@ -489,6 +540,7 @@ class ItalicMd extends InlineMd {
 class LatexMathMultiLine extends BlockMd {
   @override
   String get expString => (r"\\\[(((?!\n\n).)*?)\\\]|(\\begin.*?\\end{.*?})");
+
   @override
   RegExp get exp => RegExp(expString, dotAll: true, multiLine: true);
 
@@ -796,6 +848,7 @@ class TableMd extends BlockMd {
   @override
   String get expString =>
       (r"(((\|[^\n\|]+\|)((([^\n\|]+\|)+)?))(\n(((\|[^\n\|]+\|)(([^\n\|]+\|)+)?)))+)$");
+
   @override
   Widget build(
     BuildContext context,
@@ -891,6 +944,7 @@ class TableMd extends BlockMd {
 class CodeBlockMd extends BlockMd {
   @override
   String get expString => r"```(.*?)\n((.*?)(:?\n\s*?```)|(.*)(:?\n```)?)$";
+
   @override
   Widget build(
     BuildContext context,
