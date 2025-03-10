@@ -74,21 +74,17 @@ abstract class MarkdownComponent {
         return "";
       },
       onNonMatch: (wholeText) {
-        if(config.highlightedText == null || config.highlightedText!.isEmpty ) {
+        if (config.highlightedText == null || config.highlightedText!.isEmpty) {
           spans.add(TextSpan(text: wholeText, style: config.style));
           return "";
         }
-        // Check if highlightedText is present in wholeText
-        if (
-            wholeText.contains(config.highlightedText ?? '')) {
-          // Split the wholeText into parts
-          final highlightedTextStart = wholeText.indexOf(
-            config.highlightedText ?? '',
-          );
-          final highlightedTextEnd =
-              highlightedTextStart + (config.highlightedText?.length ?? 0);
 
-          // Add the part before the highlighted text
+        // Check if highlightedText is present in wholeText
+        if (wholeText.contains(config.highlightedText!)) {
+          final highlightedTextStart = wholeText.indexOf(config.highlightedText!);
+          final highlightedTextEnd = highlightedTextStart + config.highlightedText!.length;
+
+          // Add part before highlighted text
           spans.add(
             TextSpan(
               text: wholeText.substring(0, highlightedTextStart),
@@ -96,13 +92,10 @@ abstract class MarkdownComponent {
             ),
           );
 
-          // Add the highlighted text with the highlighted style
+          // Add highlighted part
           spans.add(
             TextSpan(
-              text: wholeText.substring(
-                highlightedTextStart,
-                highlightedTextEnd,
-              ),
+              text: wholeText.substring(highlightedTextStart, highlightedTextEnd),
               style: config.style?.copyWith(
                 backgroundColor: Colors.yellow,
                 color: Colors.black,
@@ -110,13 +103,16 @@ abstract class MarkdownComponent {
             ),
           );
 
-          // Add the part after the highlighted text
+          // Add part after highlighted text
           spans.add(
             TextSpan(
               text: wholeText.substring(highlightedTextEnd),
               style: config.style,
             ),
           );
+        } else {
+          // Add entire text if highlight not found in this segment
+          spans.add(TextSpan(text: wholeText, style: config.style));
         }
 
         return "";
