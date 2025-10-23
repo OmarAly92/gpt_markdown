@@ -145,28 +145,29 @@ class GptMarkdown extends StatelessWidget {
       );
     }
     tex = _removeExtraLinesInsideBlockLatex(tex);
-    return ClipRRect(
-      child: MdWidget(
-        tex,
-        config: GptMarkdownConfig(
-          textDirection: textDirection,
-          style: style,
-          onLinkTab: onLinkTab,
-          textAlign: textAlign,
-          textScaler: textScaler,
-          followLinkColor: followLinkColor,
-          latexWorkaround: latexWorkaround,
-          latexBuilder: latexBuilder,
-          codeBuilder: codeBuilder,
-          maxLines: maxLines,
-          overflow: overflow,
-          sourceTagBuilder: sourceTagBuilder,
-          highlightBuilder: highlightBuilder,
-          linkBuilder: linkBuilder,
-          imageBuilder: imageBuilder,
-          highlightedText: highlightedText,
-          caseSensitiveHighlight: caseSensitiveHighlight,
-        ),
+    return MdWidget(
+      tex,
+      key: highlightedText != null && highlightedText!.isNotEmpty
+          ? ValueKey('highlight_${highlightedText}_${tex.hashCode}')
+          : ValueKey('no_highlight_${tex.hashCode}'),
+      config: GptMarkdownConfig(
+        textDirection: textDirection,
+        style: style,
+        onLinkTab: onLinkTab,
+        textAlign: textAlign,
+        textScaler: textScaler,
+        followLinkColor: followLinkColor,
+        latexWorkaround: latexWorkaround,
+        latexBuilder: latexBuilder,
+        codeBuilder: codeBuilder,
+        maxLines: maxLines,
+        overflow: overflow,
+        sourceTagBuilder: sourceTagBuilder,
+        highlightBuilder: highlightBuilder,
+        linkBuilder: linkBuilder,
+        imageBuilder: imageBuilder,
+        highlightedText: highlightedText,
+        caseSensitiveHighlight: caseSensitiveHighlight,
       ),
     );
   }

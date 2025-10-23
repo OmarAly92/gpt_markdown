@@ -79,6 +79,9 @@ abstract class MarkdownComponent {
           return "";
         }
 
+        // Use the original query length for substring extraction
+        final originalQueryLength = config.highlightedText!.length;
+
         // Perform case-sensitive or case-insensitive search based on config
         final searchText = config.caseSensitiveHighlight
             ? wholeText
@@ -106,9 +109,10 @@ abstract class MarkdownComponent {
           }
 
           // Add highlighted text with original casing preserved
+          // Use original query length to ensure correct substring
           spans.add(
             TextSpan(
-              text: wholeText.substring(searchIndex, searchIndex + searchQuery.length),
+              text: wholeText.substring(searchIndex, searchIndex + originalQueryLength),
               style: config.style?.copyWith(
                 backgroundColor: Colors.yellow,
                 color: Colors.black,
@@ -116,7 +120,7 @@ abstract class MarkdownComponent {
             ),
           );
 
-          currentIndex = searchIndex + searchQuery.length;
+          currentIndex = searchIndex + originalQueryLength;
         }
 
         // Add remaining text after last highlight (or entire text if no matches)
