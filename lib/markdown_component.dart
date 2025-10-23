@@ -1059,7 +1059,12 @@ class CodeBlockMd extends BlockMd {
     bool closed = text.endsWith("```");
 
     return config.codeBuilder?.call(context, name, codes, closed) ??
-        CodeField(name: name, codes: codes);
+        CodeField(
+          name: name,
+          codes: codes,
+          highlightedText: config.highlightedText,
+          caseSensitiveHighlight: config.caseSensitiveHighlight,
+        );
   }
 }
 

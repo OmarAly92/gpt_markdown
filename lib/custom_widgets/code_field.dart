@@ -14,9 +14,17 @@ import 'package:flutter/services.dart';
 /// - Visual feedback when code is copied
 /// - Themed colors that adapt to light/dark mode
 class CodeField extends StatefulWidget {
-  const CodeField({super.key, required this.name, required this.codes});
+  const CodeField({
+    super.key,
+    required this.name,
+    required this.codes,
+    this.highlightedText,
+    this.caseSensitiveHighlight = false,
+  });
   final String name;
   final String codes;
+  final String? highlightedText;
+  final bool caseSensitiveHighlight;
 
   @override
   State<CodeField> createState() => _CodeFieldState();
@@ -24,6 +32,74 @@ class CodeField extends StatefulWidget {
 
 class _CodeFieldState extends State<CodeField> {
   bool _copied = false;
+  /// Builds the code text widget with optional search highlighting
+  Widget _buildCodeText() {
+    final codeStyle = TextStyle(
+      fontFamily: 'JetBrainsMono',
+      package: "gpt_markdown",
+    );
+
+    // If no highlighting is needed, return simple text
+    if (widget.highlightedText == null || widget.highlightedText!.isEmpty) {
+      return Text(widget.codes, style: codeStyle);
+    }
+
+    // Apply search highlighting
+    final searchQuery = widget.caseSensitiveHighlight
+        ? widget.highlightedText!
+        : widget.highlightedText!.toLowerCase();
+    final searchText = widget.caseSensitiveHighlight
+        ? widget.codes
+        : widget.codes.toLowerCase();
+
+    if (!searchText.contains(searchQuery)) {
+      return Text(widget.codes, style: codeStyle);
+    }
+
+    // Build spans with search highlighting
+    final spans = <TextSpan>[];
+    final originalQueryLength = widget.highlightedText!.length;
+    int currentIndex = 0;
+    int searchIndex = 0;
+
+    while ((searchIndex = searchText.indexOf(searchQuery, currentIndex)) != -1) {
+      // Add text before highlight
+      if (searchIndex > currentIndex) {
+        spans.add(
+          TextSpan(
+            text: widget.codes.substring(currentIndex, searchIndex),
+            style: codeStyle,
+          ),
+        );
+      }
+
+      // Add highlighted text with yellow background
+      spans.add(
+        TextSpan(
+          text: widget.codes.substring(searchIndex, searchIndex + originalQueryLength),
+          style: codeStyle.copyWith(
+            color: Colors.black,
+            backgroundColor: Colors.yellow,
+          ),
+        ),
+      );
+
+      currentIndex = searchIndex + originalQueryLength;
+    }
+
+    // Add remaining text
+    if (currentIndex < widget.codes.length) {
+      spans.add(
+        TextSpan(
+          text: widget.codes.substring(currentIndex),
+          style: codeStyle,
+        ),
+      );
+    }
+
+    return Text.rich(TextSpan(children: spans));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -72,13 +148,7 @@ class _CodeFieldState extends State<CodeField> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.all(16),
-            child: Text(
-              widget.codes,
-              style: TextStyle(
-                fontFamily: 'JetBrainsMono',
-                package: "gpt_markdown",
-              ),
-            ),
+            child: _buildCodeText(),
           ),
         ],
       ),
