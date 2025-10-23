@@ -79,23 +79,36 @@ abstract class MarkdownComponent {
           return "";
         }
 
-        // Check if highlightedText is present in wholeText
-        if (wholeText.contains(config.highlightedText!)) {
-          final highlightedTextStart = wholeText.indexOf(config.highlightedText!);
-          final highlightedTextEnd = highlightedTextStart + config.highlightedText!.length;
+        // Perform case-sensitive or case-insensitive search based on config
+        final searchText = config.caseSensitiveHighlight
+            ? wholeText
+            : wholeText.toLowerCase();
+        final searchQuery = config.caseSensitiveHighlight
+            ? config.highlightedText!
+            : config.highlightedText!.toLowerCase();
 
-          // Add part before highlighted text
+        int currentIndex = 0;
+        int searchIndex = 0;
+        bool foundAny = false;
+
+        // Find and highlight all occurrences
+        while ((searchIndex = searchText.indexOf(searchQuery, currentIndex)) != -1) {
+          foundAny = true;
+
+          // Add text before highlight (if any)
+          if (searchIndex > currentIndex) {
+            spans.add(
+              TextSpan(
+                text: wholeText.substring(currentIndex, searchIndex),
+                style: config.style,
+              ),
+            );
+          }
+
+          // Add highlighted text with original casing preserved
           spans.add(
             TextSpan(
-              text: wholeText.substring(0, highlightedTextStart),
-              style: config.style,
-            ),
-          );
-
-          // Add highlighted part
-          spans.add(
-            TextSpan(
-              text: wholeText.substring(highlightedTextStart, highlightedTextEnd),
+              text: wholeText.substring(searchIndex, searchIndex + searchQuery.length),
               style: config.style?.copyWith(
                 backgroundColor: Colors.yellow,
                 color: Colors.black,
@@ -103,15 +116,21 @@ abstract class MarkdownComponent {
             ),
           );
 
-          // Add part after highlighted text
-          spans.add(
-            TextSpan(
-              text: wholeText.substring(highlightedTextEnd),
-              style: config.style,
-            ),
-          );
+          currentIndex = searchIndex + searchQuery.length;
+        }
+
+        // Add remaining text after last highlight (or entire text if no matches)
+        if (foundAny) {
+          if (currentIndex < wholeText.length) {
+            spans.add(
+              TextSpan(
+                text: wholeText.substring(currentIndex),
+                style: config.style,
+              ),
+            );
+          }
         } else {
-          // Add entire text if highlight not found in this segment
+          // No matches found - add entire text
           spans.add(TextSpan(text: wholeText, style: config.style));
         }
 

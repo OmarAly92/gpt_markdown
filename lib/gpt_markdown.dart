@@ -39,6 +39,7 @@ class GptMarkdown extends StatelessWidget {
     this.maxLines,
     this.overflow,
     this.highlightedText,
+    this.caseSensitiveHighlight = false,
   });
 
   /// The direction of the text.
@@ -106,7 +107,12 @@ class GptMarkdown extends StatelessWidget {
   /// The image builder.
   final Widget Function(BuildContext, String imageUrl)? imageBuilder;
 
+  /// The text to highlight in the markdown content.
   final String? highlightedText;
+
+  /// Whether to use case-sensitive highlighting.
+  /// Defaults to false (case-insensitive).
+  final bool caseSensitiveHighlight;
 
   /// A method to remove extra lines inside block LaTeX.
   String _removeExtraLinesInsideBlockLatex(String text) {
@@ -159,6 +165,7 @@ class GptMarkdown extends StatelessWidget {
           linkBuilder: linkBuilder,
           imageBuilder: imageBuilder,
           highlightedText: highlightedText,
+          caseSensitiveHighlight: caseSensitiveHighlight,
         ),
       ),
     );

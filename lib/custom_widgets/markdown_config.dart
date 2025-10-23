@@ -24,6 +24,7 @@ class GptMarkdownConfig {
     this.maxLines,
     this.overflow,
     this.highlightedText,
+    this.caseSensitiveHighlight = false,
   });
 
   /// The direction of the text.
@@ -44,7 +45,12 @@ class GptMarkdownConfig {
   /// The LaTeX workaround.
   final String Function(String tex)? latexWorkaround;
 
+  /// The text to highlight in the markdown content.
   final String? highlightedText;
+
+  /// Whether to use case-sensitive highlighting.
+  /// Defaults to false (case-insensitive).
+  final bool caseSensitiveHighlight;
 
   /// The LaTeX builder.
   final Widget Function(
@@ -136,6 +142,7 @@ class GptMarkdownConfig {
     )?
     linkBuilder,
     final Widget Function(BuildContext, String imageUrl)? imageBuilder,
+    bool? caseSensitiveHighlight,
   }) {
     return GptMarkdownConfig(
       style: style ?? this.style,
@@ -153,6 +160,7 @@ class GptMarkdownConfig {
       highlightBuilder: highlightBuilder ?? this.highlightBuilder,
       linkBuilder: linkBuilder ?? this.linkBuilder,
       imageBuilder: imageBuilder ?? this.imageBuilder,
+      caseSensitiveHighlight: caseSensitiveHighlight ?? this.caseSensitiveHighlight,
     );
   }
 
