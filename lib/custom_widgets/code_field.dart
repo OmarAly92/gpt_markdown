@@ -72,7 +72,13 @@ class _CodeFieldState extends State<CodeField> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.all(16),
-            child: Text(widget.codes),
+            child: Text(
+              widget.codes,
+              style: TextStyle(
+                fontFamily: 'JetBrainsMono',
+                package: "gpt_markdown",
+              ),
+            ),
           ),
         ],
       ),

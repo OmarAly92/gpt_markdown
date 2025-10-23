@@ -38,6 +38,7 @@ class UnorderedListView extends StatelessWidget {
     return Directionality(
       textDirection: textDirection,
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         textBaseline: TextBaseline.alphabetic,
         crossAxisAlignment: CrossAxisAlignment.baseline,
         children: [
@@ -63,7 +64,7 @@ class UnorderedListView extends StatelessWidget {
                 ),
               ),
             ),
-          Expanded(child: child),
+          Flexible(child: child),
         ],
       ),
     );
@@ -104,6 +105,7 @@ class OrderedListView extends StatelessWidget {
     return Directionality(
       textDirection: textDirection,
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         textBaseline: TextBaseline.alphabetic,
         crossAxisAlignment: CrossAxisAlignment.baseline,
         children: [
@@ -111,7 +113,7 @@ class OrderedListView extends StatelessWidget {
             padding: EdgeInsetsDirectional.only(start: padding, end: spacing),
             child: Text.rich(TextSpan(text: no), style: _style),
           ),
-          Expanded(child: child),
+          Flexible(child: child),
         ],
       ),
     );

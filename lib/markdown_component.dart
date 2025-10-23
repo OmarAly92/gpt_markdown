@@ -2,11 +2,11 @@ part of 'gpt_markdown.dart';
 
 /// Markdown components
 abstract class MarkdownComponent {
-  static List<MarkdownComponent> get components => [
+  static List<MarkdownComponent> get globalComponents => [
     CodeBlockMd(),
+    LatexMathMultiLine(),
     NewLines(),
-    IndentMd(),
-    ImageMd(),
+    BlockQuote(),
     TableMd(),
     HTag(),
     UnOrderedList(),
@@ -14,14 +14,20 @@ abstract class MarkdownComponent {
     RadioButtonMd(),
     CheckBoxMd(),
     HrLine(),
-    LatexMath(),
-    LatexMathMultiLine(),
+    IndentMd(),
+  ];
+
+  static final List<MarkdownComponent> inlineComponents = [
+    ATagMd(),
     ImageMd(),
-    HighlightedText(),
+    TableMd(),
     StrikeMd(),
     BoldMd(),
     ItalicMd(),
-    ATagMd(),
+    UnderLineMd(),
+    LatexMath(),
+    LatexMathMultiLine(),
+    HighlightedText(),
     SourceTag(),
   ];
 
@@ -30,10 +36,14 @@ abstract class MarkdownComponent {
     BuildContext context,
     String text,
     final GptMarkdownConfig config,
+    bool includeGlobalComponents,
   ) {
+    var components =
+        includeGlobalComponents
+            ? config.components ?? MarkdownComponent.globalComponents
+            : config.inlineComponents ?? MarkdownComponent.inlineComponents;
     List<InlineSpan> spans = [];
-    List<String> regexes =
-        components.map<String>((e) => e.exp.pattern).toList();
+    Iterable<String> regexes = components.map<String>((e) => e.exp.pattern);
     final combinedRegex = RegExp(
       regexes.join("|"),
       multiLine: true,
@@ -44,36 +54,32 @@ abstract class MarkdownComponent {
       onMatch: (p0) {
         String element = p0[0] ?? "";
         for (var each in components) {
-          if (each.exp.hasMatch(element)) {
-            if (each.inline) {
-              spans.add(each.span(context, element, config));
-            } else {
-              spans.addAll([
-                TextSpan(
-                  text: "\n ",
-                  style: TextStyle(
-                    fontSize: 0,
-                    height: 0,
-                    color: config.style?.color,
-                  ),
-                ),
-                each.span(context, element, config),
-                TextSpan(
-                  text: "\n ",
-                  style: TextStyle(
-                    fontSize: 0,
-                    height: 0,
-                    color: config.style?.color,
-                  ),
-                ),
-              ]);
-            }
+          var p = each.exp.pattern;
+          var exp = RegExp(
+            '^$p\$',
+            multiLine: each.exp.isMultiLine,
+            dotAll: each.exp.isDotAll,
+          );
+          if (exp.hasMatch(element)) {
+            spans.add(each.span(context, element, config));
             return "";
           }
         }
         return "";
       },
       onNonMatch: (wholeText) {
+        if (wholeText.isEmpty) {
+          return "";
+        }
+
+        // Handle global components first
+        if (includeGlobalComponents) {
+          var newSpans = generate(context, wholeText, config.copyWith(), false);
+          spans.addAll(newSpans);
+          return "";
+        }
+
+        // Then handle search highlighting
         if (config.highlightedText == null || config.highlightedText!.isEmpty) {
           spans.add(TextSpan(text: wholeText, style: config.style));
           return "";
@@ -175,7 +181,8 @@ abstract class BlockMd extends MarkdownComponent {
   bool get inline => false;
 
   @override
-  RegExp get exp => RegExp(r'^\ *?' + expString, dotAll: true, multiLine: true);
+  RegExp get exp =>
+      RegExp(r'^\ *?' + expString + r"$", dotAll: true, multiLine: true);
 
   String get expString;
 
@@ -191,9 +198,21 @@ abstract class BlockMd extends MarkdownComponent {
     var child = build(context, text, config);
     length = min(length, 4);
     if (length > 0) {
-      child = UnorderedListView(spacing: length * 6.0, child: child);
+      child = UnorderedListView(
+        spacing: length * 1.0,
+        textDirection: config.textDirection,
+        child: child,
+      );
     }
-    return WidgetSpan(child: child, alignment: PlaceholderAlignment.middle);
+    child = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [Flexible(child: child)],
+    );
+    return WidgetSpan(
+      child: child,
+      alignment: PlaceholderAlignment.baseline,
+      baseline: TextBaseline.alphabetic,
+    );
   }
 
   Widget build(
@@ -201,6 +220,41 @@ abstract class BlockMd extends MarkdownComponent {
     String text,
     final GptMarkdownConfig config,
   );
+}
+
+/// Indent component
+class IndentMd extends BlockMd {
+  @override
+  String get expString => (r"^(\ \ +)([^\n]+)$");
+  @override
+  Widget build(
+    BuildContext context,
+    String text,
+    final GptMarkdownConfig config,
+  ) {
+    var match = this.exp.firstMatch(text);
+    var conf = config.copyWith();
+    return Directionality(
+      textDirection: config.textDirection,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: config.getRich(
+              TextSpan(
+                children: MarkdownComponent.generate(
+                  context,
+                  match?[2]?.trim() ?? "",
+                  conf,
+                  false,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Heading component
@@ -217,14 +271,15 @@ class HTag extends BlockMd {
     var theme = GptMarkdownTheme.of(context);
     var match = this.exp.firstMatch(text.trim());
     var conf = config.copyWith(
-      style: [
-        theme.h1,
-        theme.h2,
-        theme.h3,
-        theme.h4,
-        theme.h5,
-        theme.h6,
-      ][match![1]!.length - 1]?.copyWith(color: config.style?.color),
+      style:
+          [
+            theme.h1,
+            theme.h2,
+            theme.h3,
+            theme.h4,
+            theme.h5,
+            theme.h6,
+          ][match![1]!.length - 1],
     );
     return config.getRich(
       TextSpan(
@@ -233,6 +288,7 @@ class HTag extends BlockMd {
             context,
             "${match.namedGroup('data')}",
             conf,
+            false,
           )),
           if (match.namedGroup('hash')!.length == 1) ...[
             const TextSpan(
@@ -265,8 +321,12 @@ class NewLines extends InlineMd {
     final GptMarkdownConfig config,
   ) {
     return TextSpan(
-      text: "\n\n\n\n",
-      style: TextStyle(fontSize: 6, color: config.style?.color),
+      text: "\n\n",
+      style: TextStyle(
+        fontSize: config.style?.fontSize ?? 14,
+        height: 1.15,
+        color: config.style?.color,
+      ),
     );
   }
 }
@@ -274,7 +334,7 @@ class NewLines extends InlineMd {
 /// Horizontal line component
 class HrLine extends BlockMd {
   @override
-  String get expString => (r"(--)[-]+$");
+  String get expString => (r"⸻|((--)[-]+)$");
 
   @override
   Widget build(
@@ -294,9 +354,7 @@ class HrLine extends BlockMd {
 /// Checkbox component
 class CheckBoxMd extends BlockMd {
   @override
-  String get expString => (r"\[(\x?)\]\ (\S[^\n]*?)$");
-
-  get onLinkTab => null;
+  String get expString => (r"\[((?:\x|\ ))\]\ (\S[^\n]*?)$");
 
   @override
   Widget build(
@@ -308,7 +366,7 @@ class CheckBoxMd extends BlockMd {
     return CustomCb(
       value: ("${match?[1]}" == "x"),
       textDirection: config.textDirection,
-      child: MdWidget("${match?[2]}", config: config),
+      child: MdWidget(context, "${match?[2]}", false, config: config),
     );
   }
 }
@@ -316,9 +374,7 @@ class CheckBoxMd extends BlockMd {
 /// Radio Button component
 class RadioButtonMd extends BlockMd {
   @override
-  String get expString => (r"\((\x?)\)\ (\S[^\n]*)$");
-
-  get onLinkTab => null;
+  String get expString => (r"\(((?:\x|\ ))\)\ (\S[^\n]*)$");
 
   @override
   Widget build(
@@ -330,20 +386,24 @@ class RadioButtonMd extends BlockMd {
     return CustomRb(
       value: ("${match?[1]}" == "x"),
       textDirection: config.textDirection,
-      child: MdWidget("${match?[2]}", config: config),
+      child: MdWidget(context, "${match?[2]}", false, config: config),
     );
   }
 }
 
-/// Indent
-class IndentMd extends InlineMd {
+/// Block quote component
+class BlockQuote extends InlineMd {
   @override
   bool get inline => false;
 
   @override
   RegExp get exp =>
   // RegExp(r"(?<=\n\n)(\ +)(.+?)(?=\n\n)", dotAll: true, multiLine: true);
-  RegExp(r"^>([^\n]+)$", dotAll: true, multiLine: true);
+  RegExp(
+    r"(?:(?:^)\ *>[^\n]+)(?:(?:\n)\ *>[^\n]+)*",
+    dotAll: true,
+    multiLine: true,
+  );
 
   @override
   InlineSpan span(
@@ -352,11 +412,22 @@ class IndentMd extends InlineMd {
     final GptMarkdownConfig config,
   ) {
     var match = exp.firstMatch(text);
-    var data = "${match?[1]}".trim();
-    // data = data.replaceAll(RegExp(r'\n\ {' '$spaces' '}'), '\n').trim();
-    data = data.trim();
+    var dataBuilder = StringBuffer();
+    var m = match?[0] ?? '';
+    for (var each in m.split('\n')) {
+      if (each.startsWith(RegExp(r'\ *>'))) {
+        var subString = each.trimLeft().substring(1);
+        if (subString.startsWith(' ')) {
+          subString = subString.substring(1);
+        }
+        dataBuilder.writeln(subString);
+      } else {
+        dataBuilder.writeln(each);
+      }
+    }
+    var data = dataBuilder.toString().trim();
     var child = TextSpan(
-      children: MarkdownComponent.generate(context, data, config),
+      children: MarkdownComponent.generate(context, data, config, true),
     );
     return TextSpan(
       children: [
@@ -365,11 +436,12 @@ class IndentMd extends InlineMd {
             textDirection: config.textDirection,
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 2),
-              child: IndentWidget(
+              child: BlockQuoteWidget(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
                 direction: config.textDirection,
+                width: 3,
                 child: Padding(
-                  padding: const EdgeInsetsDirectional.only(start: 10.0),
+                  padding: const EdgeInsetsDirectional.only(start: 8.0),
                   child: config.getRich(child),
                 ),
               ),
@@ -393,26 +465,34 @@ class UnOrderedList extends BlockMd {
     final GptMarkdownConfig config,
   ) {
     var match = this.exp.firstMatch(text);
-    return UnorderedListView(
-      bulletColor:
-          (config.style?.color ?? DefaultTextStyle.of(context).style.color),
-      padding: 7,
-      spacing: 10,
-      bulletSize:
-          0.3 *
-          (config.style?.fontSize ??
-              DefaultTextStyle.of(context).style.fontSize ??
-              kDefaultFontSize),
-      textDirection: config.textDirection,
-      child: MdWidget("${match?[1]?.trim()}", config: config),
-    );
+
+    var child = MdWidget(context, "${match?[1]?.trim()}", true, config: config);
+
+    return config.unOrderedListBuilder?.call(
+          context,
+          child,
+          config.copyWith(),
+        ) ??
+        UnorderedListView(
+          bulletColor:
+              (config.style?.color ?? DefaultTextStyle.of(context).style.color),
+          padding: 7,
+          spacing: 10,
+          bulletSize:
+              0.3 *
+              (config.style?.fontSize ??
+                  DefaultTextStyle.of(context).style.fontSize ??
+                  kDefaultFontSize),
+          textDirection: config.textDirection,
+          child: child,
+        );
   }
 }
 
 /// Ordered list component
 class OrderedList extends BlockMd {
   @override
-  String get expString => (r"([0-9]+\.)\ ([^\n]+)$");
+  String get expString => (r"([0-9]+)\.\ ([^\n]+)$");
 
   @override
   Widget build(
@@ -420,15 +500,25 @@ class OrderedList extends BlockMd {
     String text,
     final GptMarkdownConfig config,
   ) {
-    var match = this.exp.firstMatch(text.trim());
-    return OrderedListView(
-      no: "${match?[1]}",
-      textDirection: config.textDirection,
-      style: (config.style ?? const TextStyle()).copyWith(
-        fontWeight: FontWeight.w100,
-      ),
-      child: MdWidget("${match?[2]?.trim()}", config: config),
-    );
+    var match = this.exp.firstMatch(text);
+
+    var no = "${match?[1]}".trim();
+
+    var child = MdWidget(context, "${match?[2]}".trim(), true, config: config);
+    return config.orderedListBuilder?.call(
+          context,
+          no,
+          child,
+          config.copyWith(),
+        ) ??
+        OrderedListView(
+          no: "$no.",
+          textDirection: config.textDirection,
+          style: (config.style ?? const TextStyle()).copyWith(
+            fontWeight: FontWeight.w100,
+          ),
+          child: child,
+        );
   }
 }
 
@@ -549,7 +639,12 @@ class BoldMd extends InlineMd {
           const TextStyle(fontWeight: FontWeight.bold),
     );
     return TextSpan(
-      children: MarkdownComponent.generate(context, "${match?[1]}", conf),
+      children: MarkdownComponent.generate(
+        context,
+        "${match?[1]}",
+        conf,
+        false,
+      ),
       style: conf.style,
     );
   }
@@ -575,7 +670,12 @@ class StrikeMd extends InlineMd {
           const TextStyle(decoration: TextDecoration.lineThrough),
     );
     return TextSpan(
-      children: MarkdownComponent.generate(context, "${match?[1]}", conf),
+      children: MarkdownComponent.generate(
+        context,
+        "${match?[1]}",
+        conf,
+        false,
+      ),
       style: conf.style,
     );
   }
@@ -584,10 +684,8 @@ class StrikeMd extends InlineMd {
 /// Italic text component
 class ItalicMd extends InlineMd {
   @override
-  RegExp get exp => RegExp(
-    r"(?<!\*)\*(?<!\s)(.+?)(?<!\s)\*(?!\*)|\_(?<!\s)(.+?)(?<!\s)\_",
-    dotAll: true,
-  );
+  RegExp get exp =>
+      RegExp(r"(?:(?<!\*)\*(?<!\s)(.+?)(?<!\s)\*(?!\*))", dotAll: true);
 
   @override
   InlineSpan span(
@@ -603,7 +701,7 @@ class ItalicMd extends InlineMd {
       ),
     );
     return TextSpan(
-      children: MarkdownComponent.generate(context, "$data", conf),
+      children: MarkdownComponent.generate(context, "$data", conf, false),
       style: conf.style,
     );
   }
@@ -611,7 +709,8 @@ class ItalicMd extends InlineMd {
 
 class LatexMathMultiLine extends BlockMd {
   @override
-  String get expString => (r"\\\[(((?!\n\n).)*?)\\\]|(\\begin.*?\\end{.*?})");
+  String get expString => (r"\ *\\\[((?:.)*?)\\\]|(\ *\\begin.*?\\end{.*?})");
+  // (r"\ *\\\[((?:(?!\n\n\n).)*?)\\\]|(\\begin.*?\\end{.*?})");
 
   @override
   RegExp get exp => RegExp(expString, dotAll: true, multiLine: true);
@@ -623,7 +722,7 @@ class LatexMathMultiLine extends BlockMd {
     final GptMarkdownConfig config,
   ) {
     var p0 = exp.firstMatch(text.trim());
-    String mathText = p0?[1] ?? p0?[2] ?? "";
+    String mathText = p0?[1] ?? p0?[2] ?? '';
     var workaround = config.latexWorkaround ?? (String tex) => tex;
 
     var builder =
@@ -809,7 +908,7 @@ class SourceTag extends InlineMd {
 /// Link text component
 class ATagMd extends InlineMd {
   @override
-  RegExp get exp => RegExp(r"\[([^\s\*\[][^\n]*?[^\s]?)?\]\(([^\s\*]*[^\)])\)");
+  RegExp get exp => RegExp(r"(?<!\!)\[.*\]\([^\s]*\)");
 
   @override
   InlineSpan span(
@@ -817,24 +916,91 @@ class ATagMd extends InlineMd {
     String text,
     final GptMarkdownConfig config,
   ) {
-    var match = exp.firstMatch(text.trim());
-    if (match?[1] == null && match?[2] == null) {
+    var bracketCount = 0;
+    var start = 1;
+    var end = 0;
+    for (var i = 0; i < text.length; i++) {
+      if (text[i] == '[') {
+        bracketCount++;
+      } else if (text[i] == ']') {
+        bracketCount--;
+        if (bracketCount == 0) {
+          end = i;
+          break;
+        }
+      }
+    }
+
+    if (text[end + 1] != '(') {
       return const TextSpan();
     }
 
-    final linkText = match?[1] ?? "";
-    final url = match?[2] ?? "";
+    // First try to find the basic pattern
+    // final basicMatch = RegExp(r'(?<!\!)\[(.*)\]\(').firstMatch(text.trim());
+    // if (basicMatch == null) {
+    //   return const TextSpan();
+    // }
+
+    final linkText = text.substring(start, end);
+    final urlStart = end + 2;
+
+    // Now find the balanced closing parenthesis
+    int parenCount = 0;
+    int urlEnd = urlStart;
+
+    for (int i = urlStart; i < text.length; i++) {
+      final char = text[i];
+
+      if (char == '(') {
+        parenCount++;
+      } else if (char == ')') {
+        if (parenCount == 0) {
+          // This is the closing parenthesis of the link
+          urlEnd = i;
+          break;
+        } else {
+          parenCount--;
+        }
+      }
+    }
+
+    if (urlEnd == urlStart) {
+      // No closing parenthesis found
+      return const TextSpan();
+    }
+
+    final url = text.substring(urlStart, urlEnd).trim();
 
     var builder = config.linkBuilder;
 
+    var ending = text.substring(urlEnd + 1);
+
+    var endingSpans = MarkdownComponent.generate(
+      context,
+      ending,
+      config,
+      false,
+    );
+    var theme = GptMarkdownTheme.of(context);
+    var linkTextSpan = TextSpan(
+      children: MarkdownComponent.generate(context, linkText, config, false),
+      style: config.style?.copyWith(
+        color: theme.linkColor,
+        decorationColor: theme.linkColor,
+      ),
+    );
+
     // Use custom builder if provided
+    WidgetSpan? child;
     if (builder != null) {
-      return WidgetSpan(
+      child = WidgetSpan(
+        baseline: TextBaseline.alphabetic,
+        alignment: PlaceholderAlignment.baseline,
         child: GestureDetector(
-          onTap: () => config.onLinkTab?.call(url, linkText),
+          onTap: () => config.onLinkTap?.call(url, linkText),
           child: builder(
             context,
-            linkText,
+            linkTextSpan,
             url,
             config.style ?? const TextStyle(),
           ),
@@ -843,25 +1009,29 @@ class ATagMd extends InlineMd {
     }
 
     // Default rendering
-    var theme = GptMarkdownTheme.of(context);
-    return WidgetSpan(
+    child ??= WidgetSpan(
+      alignment: PlaceholderAlignment.baseline,
+      baseline: TextBaseline.alphabetic,
       child: LinkButton(
         hoverColor: theme.linkHoverColor,
         color: theme.linkColor,
         onPressed: () {
-          config.onLinkTab?.call(url, linkText);
+          config.onLinkTap?.call(url, linkText);
         },
         text: linkText,
         config: config,
+        child: config.getRich(linkTextSpan),
       ),
     );
+    var textSpan = TextSpan(children: [child, ...endingSpans]);
+    return textSpan;
   }
 }
 
 /// Image component
 class ImageMd extends InlineMd {
   @override
-  RegExp get exp => RegExp(r"\!\[([^\s][^\n]*[^\s]?)?\]\(([^\s]+?)\)");
+  RegExp get exp => RegExp(r"\!\[[^\[\]]*\]\([^\s]*\)");
 
   @override
   InlineSpan span(
@@ -869,25 +1039,59 @@ class ImageMd extends InlineMd {
     String text,
     final GptMarkdownConfig config,
   ) {
-    var match = exp.firstMatch(text.trim());
+    // First try to find the basic pattern
+    final basicMatch = RegExp(r'\!\[([^\[\]]*)\]\(').firstMatch(text.trim());
+    if (basicMatch == null) {
+      return const TextSpan();
+    }
+
+    final altText = basicMatch.group(1) ?? '';
+    final urlStart = basicMatch.end;
+
+    // Now find the balanced closing parenthesis
+    int parenCount = 0;
+    int urlEnd = urlStart;
+
+    for (int i = urlStart; i < text.length; i++) {
+      final char = text[i];
+
+      if (char == '(') {
+        parenCount++;
+      } else if (char == ')') {
+        if (parenCount == 0) {
+          // This is the closing parenthesis of the image
+          urlEnd = i;
+          break;
+        } else {
+          parenCount--;
+        }
+      }
+    }
+
+    if (urlEnd == urlStart) {
+      // No closing parenthesis found
+      return const TextSpan();
+    }
+
+    final url = text.substring(urlStart, urlEnd).trim();
+
     double? height;
     double? width;
-    if (match?[1] != null) {
-      var size = RegExp(
-        r"^([0-9]+)?x?([0-9]+)?",
-      ).firstMatch(match![1].toString().trim());
+    if (altText.isNotEmpty) {
+      var size = RegExp(r"^([0-9]+)?x?([0-9]+)?").firstMatch(altText.trim());
       width = double.tryParse(size?[1]?.toString().trim() ?? 'a');
       height = double.tryParse(size?[2]?.toString().trim() ?? 'a');
     }
+
     final Widget image;
     if (config.imageBuilder != null) {
-      image = config.imageBuilder!(context, '${match?[2]}');
+      image = config.imageBuilder!(context, url);
     } else {
       image = SizedBox(
         width: width,
         height: height,
         child: Image(
-          image: NetworkImage("${match?[2]}"),
+          image: NetworkImage(url),
           loadingBuilder: (
             BuildContext context,
             Widget child,
@@ -919,7 +1123,7 @@ class ImageMd extends InlineMd {
 class TableMd extends BlockMd {
   @override
   String get expString =>
-      (r"(((\|[^\n\|]+\|)((([^\n\|]+\|)+)?))(\n(((\|[^\n\|]+\|)(([^\n\|]+\|)+)?)))+)$");
+      (r"(((\|[^\n\|]+\|)((([^\n\|]+\|)+)?)\ *)(\n\ *(((\|[^\n\|]+\|)(([^\n\|]+\|)+)?))\ *)+)$");
 
   @override
   Widget build(
@@ -933,25 +1137,87 @@ class TableMd extends BlockMd {
             .map<Map<int, String>>(
               (e) =>
                   e
+                      .trim()
                       .split('|')
                       .where((element) => element.isNotEmpty)
                       .toList()
                       .asMap(),
             )
             .toList();
-    bool heading = RegExp(
-      r"^\|.*?\|\n\|-[-\\ |]*?-\|$",
-      multiLine: true,
-    ).hasMatch(text.trim());
+
+    // Check if table has a header and separator row
+    bool hasHeader = value.length >= 2;
+    List<TextAlign> columnAlignments = [];
+
+    if (hasHeader) {
+      // Parse alignment from the separator row (second row)
+      var separatorRow = value[1];
+      columnAlignments = List.generate(separatorRow.length, (index) {
+        String separator = separatorRow[index] ?? "";
+        separator = separator.trim();
+
+        // Check for alignment indicators
+        bool hasLeftColon = separator.startsWith(':');
+        bool hasRightColon = separator.endsWith(':');
+
+        if (hasLeftColon && hasRightColon) {
+          return TextAlign.center;
+        } else if (hasRightColon) {
+          return TextAlign.right;
+        } else if (hasLeftColon) {
+          return TextAlign.left;
+        } else {
+          return TextAlign.left; // Default alignment
+        }
+      });
+    }
+
     int maxCol = 0;
     for (final each in value) {
       if (maxCol < each.keys.length) {
         maxCol = each.keys.length;
       }
     }
+
     if (maxCol == 0) {
       return Text("", style: config.style);
     }
+
+    // Ensure we have alignment for all columns
+    while (columnAlignments.length < maxCol) {
+      columnAlignments.add(TextAlign.left);
+    }
+
+    var tableBuilder = config.tableBuilder;
+
+    if (tableBuilder != null) {
+      var customTable =
+          List<CustomTableRow?>.generate(value.length, (index) {
+            var isHeader = index == 0;
+            var row = value[index];
+            if (row.isEmpty) {
+              return null;
+            }
+            if (index == 1) {
+              return null;
+            }
+            var fields = List<CustomTableField>.generate(maxCol, (index) {
+              var field = row[index];
+              return CustomTableField(
+                data: field ?? "",
+                alignment: columnAlignments[index],
+              );
+            });
+            return CustomTableRow(isHeader: isHeader, fields: fields);
+          }).nonNulls.toList();
+      return tableBuilder(
+        context,
+        customTable,
+        config.style ?? const TextStyle(),
+        config,
+      );
+    }
+
     final controller = ScrollController();
     return Scrollbar(
       controller: controller,
@@ -970,39 +1236,67 @@ class TableMd extends BlockMd {
               value
                   .asMap()
                   .entries
+                  .where((entry) {
+                    // Skip the separator row (second row) from rendering
+                    if (hasHeader && entry.key == 1) {
+                      return false;
+                    }
+                    return true;
+                  })
                   .map<TableRow>(
                     (entry) => TableRow(
                       decoration:
-                          (heading)
+                          (hasHeader && entry.key == 0)
                               ? BoxDecoration(
                                 color:
-                                    (entry.key == 0)
-                                        ? Theme.of(
-                                          context,
-                                        ).colorScheme.surfaceContainerHighest
-                                        : null,
+                                    Theme.of(
+                                      context,
+                                    ).colorScheme.surfaceContainerHighest,
                               )
                               : null,
                       children: List.generate(maxCol, (index) {
                         var e = entry.value;
                         String data = e[index] ?? "";
-                        if (RegExp(r"^--+$").hasMatch(data.trim()) ||
+                        if (RegExp(r"^:?--+:?$").hasMatch(data.trim()) ||
                             data.trim().isEmpty) {
                           return const SizedBox();
                         }
 
-                        return Center(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            child: MdWidget(
-                              (e[index] ?? "").trim(),
-                              config: config,
-                            ),
+                        // Apply alignment based on column alignment
+                        Widget content = Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          child: MdWidget(
+                            context,
+                            (e[index] ?? "").trim(),
+                            false,
+                            config: config,
                           ),
                         );
+
+                        // Wrap with alignment widget
+                        switch (columnAlignments[index]) {
+                          case TextAlign.center:
+                            content = Center(child: content);
+                            break;
+                          case TextAlign.right:
+                            content = Align(
+                              alignment: Alignment.centerRight,
+                              child: content,
+                            );
+                            break;
+                          case TextAlign.left:
+                          default:
+                            content = Align(
+                              alignment: Alignment.centerLeft,
+                              child: content,
+                            );
+                            break;
+                        }
+
+                        return content;
                       }),
                     ),
                   )
@@ -1025,10 +1319,54 @@ class CodeBlockMd extends BlockMd {
   ) {
     String codes = this.exp.firstMatch(text)?[2] ?? "";
     String name = this.exp.firstMatch(text)?[1] ?? "";
-    codes = codes.replaceAll(r"```", "").trim();
+    codes = codes.replaceAll(r"```", "");
     bool closed = text.endsWith("```");
 
     return config.codeBuilder?.call(context, name, codes, closed) ??
         CodeField(name: name, codes: codes);
   }
+}
+
+class UnderLineMd extends InlineMd {
+  @override
+  RegExp get exp =>
+      RegExp(r"<u>(.*?)(?:</u>|$)", multiLine: true, dotAll: true);
+
+  @override
+  InlineSpan span(
+    BuildContext context,
+    String text,
+    final GptMarkdownConfig config,
+  ) {
+    var match = exp.firstMatch(text.trim());
+    var conf = config.copyWith(
+      style: (config.style ?? const TextStyle()).copyWith(
+        decoration: TextDecoration.underline,
+        decorationColor: config.style?.color,
+      ),
+    );
+    return TextSpan(
+      children: MarkdownComponent.generate(
+        context,
+        "${match?[1]}",
+        conf,
+        false,
+      ),
+      style: conf.style,
+    );
+  }
+}
+
+class CustomTableField {
+  final String data;
+  final TextAlign alignment;
+
+  CustomTableField({required this.data, this.alignment = TextAlign.left});
+}
+
+class CustomTableRow {
+  final bool isHeader;
+  final List<CustomTableField> fields;
+
+  CustomTableRow({this.isHeader = false, required this.fields});
 }
