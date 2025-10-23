@@ -443,20 +443,20 @@ class HighlightedText extends InlineMd {
     final GptMarkdownConfig config,
   ) {
     var match = exp.firstMatch(text.trim());
-    var highlightedText = match?[1] ?? "";
+    var codeText = match?[1] ?? "";
 
     if (config.highlightBuilder != null) {
       return WidgetSpan(
         alignment: PlaceholderAlignment.middle,
         child: config.highlightBuilder!(
           context,
-          highlightedText,
+          codeText,
           config.style ?? const TextStyle(),
         ),
       );
     }
 
-    var style =
+    var codeStyle =
         config.style?.copyWith(
           fontWeight: FontWeight.bold,
           background:
@@ -474,7 +474,60 @@ class HighlightedText extends InlineMd {
                 ..strokeJoin = StrokeJoin.round,
         );
 
-    return TextSpan(text: highlightedText, style: style);
+    // Apply search highlighting inside inline code blocks
+    if (config.highlightedText != null && config.highlightedText!.isNotEmpty) {
+      final searchQuery = config.caseSensitiveHighlight
+          ? config.highlightedText!
+          : config.highlightedText!.toLowerCase();
+      final searchText = config.caseSensitiveHighlight
+          ? codeText
+          : codeText.toLowerCase();
+
+      if (searchText.contains(searchQuery)) {
+        // Build spans with search highlighting
+        final spans = <InlineSpan>[];
+        final originalQueryLength = config.highlightedText!.length;
+        int currentIndex = 0;
+        int searchIndex = 0;
+
+        while ((searchIndex = searchText.indexOf(searchQuery, currentIndex)) != -1) {
+          // Add text before highlight
+          if (searchIndex > currentIndex) {
+            spans.add(TextSpan(
+              text: codeText.substring(currentIndex, searchIndex),
+              style: codeStyle,
+            ));
+          }
+
+          // Add highlighted text with yellow background (same as normal text highlighting)
+          // Use codeStyle.copyWith to preserve font size and other properties
+          spans.add(TextSpan(
+            text: codeText.substring(searchIndex, searchIndex + originalQueryLength),
+            style: codeStyle.copyWith(
+              color: Colors.black,
+              background: Paint()
+                ..color = Colors.yellow
+                ..strokeCap = StrokeCap.round
+                ..strokeJoin = StrokeJoin.round,
+            ),
+          ));
+
+          currentIndex = searchIndex + originalQueryLength;
+        }
+
+        // Add remaining text
+        if (currentIndex < codeText.length) {
+          spans.add(TextSpan(
+            text: codeText.substring(currentIndex),
+            style: codeStyle,
+          ));
+        }
+
+        return TextSpan(children: spans);
+      }
+    }
+
+    return TextSpan(text: codeText, style: codeStyle);
   }
 }
 

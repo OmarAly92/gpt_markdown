@@ -142,6 +142,7 @@ class GptMarkdownConfig {
     )?
     linkBuilder,
     final Widget Function(BuildContext, String imageUrl)? imageBuilder,
+    String? highlightedText,
     bool? caseSensitiveHighlight,
   }) {
     return GptMarkdownConfig(
@@ -160,6 +161,7 @@ class GptMarkdownConfig {
       highlightBuilder: highlightBuilder ?? this.highlightBuilder,
       linkBuilder: linkBuilder ?? this.linkBuilder,
       imageBuilder: imageBuilder ?? this.imageBuilder,
+      highlightedText: highlightedText ?? this.highlightedText,
       caseSensitiveHighlight: caseSensitiveHighlight ?? this.caseSensitiveHighlight,
     );
   }
