@@ -44,22 +44,14 @@ abstract class MarkdownComponent {
             : config.inlineComponents ?? MarkdownComponent.inlineComponents;
     List<InlineSpan> spans = [];
     Iterable<String> regexes = components.map<String>((e) => e.exp.pattern);
-    final combinedRegex = RegExp(
-      regexes.join("|"),
-      multiLine: true,
-      dotAll: true,
-    );
+    final combinedRegex = RegExp(regexes.join("|"), multiLine: true, dotAll: true);
     text.splitMapJoin(
       combinedRegex,
       onMatch: (p0) {
         String element = p0[0] ?? "";
         for (var each in components) {
           var p = each.exp.pattern;
-          var exp = RegExp(
-            '^$p\$',
-            multiLine: each.exp.isMultiLine,
-            dotAll: each.exp.isDotAll,
-          );
+          var exp = RegExp('^$p\$', multiLine: each.exp.isMultiLine, dotAll: each.exp.isDotAll);
           if (exp.hasMatch(element)) {
             spans.add(each.span(context, element, config));
             return "";
@@ -89,12 +81,11 @@ abstract class MarkdownComponent {
         final originalQueryLength = config.highlightedText!.length;
 
         // Perform case-sensitive or case-insensitive search based on config
-        final searchText = config.caseSensitiveHighlight
-            ? wholeText
-            : wholeText.toLowerCase();
-        final searchQuery = config.caseSensitiveHighlight
-            ? config.highlightedText!
-            : config.highlightedText!.toLowerCase();
+        final searchText = config.caseSensitiveHighlight ? wholeText : wholeText.toLowerCase();
+        final searchQuery =
+            config.caseSensitiveHighlight
+                ? config.highlightedText!
+                : config.highlightedText!.toLowerCase();
 
         int currentIndex = 0;
         int searchIndex = 0;
@@ -107,10 +98,7 @@ abstract class MarkdownComponent {
           // Add text before highlight (if any)
           if (searchIndex > currentIndex) {
             spans.add(
-              TextSpan(
-                text: wholeText.substring(currentIndex, searchIndex),
-                style: config.style,
-              ),
+              TextSpan(text: wholeText.substring(currentIndex, searchIndex), style: config.style),
             );
           }
 
@@ -119,10 +107,7 @@ abstract class MarkdownComponent {
           spans.add(
             TextSpan(
               text: wholeText.substring(searchIndex, searchIndex + originalQueryLength),
-              style: config.style?.copyWith(
-                backgroundColor: Colors.yellow,
-                color: Colors.black,
-              ),
+              style: config.style?.copyWith(backgroundColor: Colors.yellow, color: Colors.black),
             ),
           );
 
@@ -132,12 +117,7 @@ abstract class MarkdownComponent {
         // Add remaining text after last highlight (or entire text if no matches)
         if (foundAny) {
           if (currentIndex < wholeText.length) {
-            spans.add(
-              TextSpan(
-                text: wholeText.substring(currentIndex),
-                style: config.style,
-              ),
-            );
+            spans.add(TextSpan(text: wholeText.substring(currentIndex), style: config.style));
           }
         } else {
           // No matches found - add entire text
@@ -151,11 +131,7 @@ abstract class MarkdownComponent {
     return spans;
   }
 
-  InlineSpan span(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  );
+  InlineSpan span(BuildContext context, String text, final GptMarkdownConfig config);
 
   RegExp get exp;
 
@@ -168,11 +144,7 @@ abstract class InlineMd extends MarkdownComponent {
   bool get inline => true;
 
   @override
-  InlineSpan span(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  );
+  InlineSpan span(BuildContext context, String text, final GptMarkdownConfig config);
 }
 
 /// Block component
@@ -181,17 +153,12 @@ abstract class BlockMd extends MarkdownComponent {
   bool get inline => false;
 
   @override
-  RegExp get exp =>
-      RegExp(r'^\ *?' + expString + r"$", dotAll: true, multiLine: true);
+  RegExp get exp => RegExp(r'^\ *?' + expString + r"$", dotAll: true, multiLine: true);
 
   String get expString;
 
   @override
-  InlineSpan span(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  InlineSpan span(BuildContext context, String text, final GptMarkdownConfig config) {
     var matches = RegExp(r'^(?<spaces>\ \ +).*').firstMatch(text);
     var spaces = matches?.namedGroup('spaces');
     var length = spaces?.length ?? 0;
@@ -204,10 +171,7 @@ abstract class BlockMd extends MarkdownComponent {
         child: child,
       );
     }
-    child = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [Flexible(child: child)],
-    );
+    child = Row(mainAxisSize: MainAxisSize.min, children: [Flexible(child: child)]);
     return WidgetSpan(
       child: child,
       alignment: PlaceholderAlignment.baseline,
@@ -215,23 +179,16 @@ abstract class BlockMd extends MarkdownComponent {
     );
   }
 
-  Widget build(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  );
+  Widget build(BuildContext context, String text, final GptMarkdownConfig config);
 }
 
 /// Indent component
 class IndentMd extends BlockMd {
   @override
   String get expString => (r"^(\ \ +)([^\n]+)$");
+
   @override
-  Widget build(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  Widget build(BuildContext context, String text, final GptMarkdownConfig config) {
     var match = this.exp.firstMatch(text);
     var conf = config.copyWith();
     return Directionality(
@@ -242,12 +199,7 @@ class IndentMd extends BlockMd {
           Flexible(
             child: config.getRich(
               TextSpan(
-                children: MarkdownComponent.generate(
-                  context,
-                  match?[2]?.trim() ?? "",
-                  conf,
-                  false,
-                ),
+                children: MarkdownComponent.generate(context, match?[2]?.trim() ?? "", conf, false),
               ),
             ),
           ),
@@ -263,44 +215,22 @@ class HTag extends BlockMd {
   String get expString => (r"(?<hash>#{1,6})\ (?<data>[^\n]+?)$");
 
   @override
-  Widget build(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  Widget build(BuildContext context, String text, final GptMarkdownConfig config) {
     var theme = GptMarkdownTheme.of(context);
     var match = this.exp.firstMatch(text.trim());
     var conf = config.copyWith(
-      style:
-          [
-            theme.h1,
-            theme.h2,
-            theme.h3,
-            theme.h4,
-            theme.h5,
-            theme.h6,
-          ][match![1]!.length - 1],
+      style: [theme.h1, theme.h2, theme.h3, theme.h4, theme.h5, theme.h6][match![1]!.length - 1],
     );
     return config.getRich(
       TextSpan(
         children: [
-          ...(MarkdownComponent.generate(
-            context,
-            "${match.namedGroup('data')}",
-            conf,
-            false,
-          )),
+          ...(MarkdownComponent.generate(context, "${match.namedGroup('data')}", conf, false)),
           if (match.namedGroup('hash')!.length == 1) ...[
-            const TextSpan(
-              text: "\n ",
-              style: TextStyle(fontSize: 0, height: 0),
-            ),
+            const TextSpan(text: "\n ", style: TextStyle(fontSize: 0, height: 0)),
             WidgetSpan(
               child: CustomDivider(
                 height: theme.hrLineThickness,
-                color:
-                    config.style?.color ??
-                    Theme.of(context).colorScheme.outline,
+                color: config.style?.color ?? Theme.of(context).colorScheme.outline,
               ),
             ),
           ],
@@ -315,11 +245,7 @@ class NewLines extends InlineMd {
   RegExp get exp => RegExp(r"\n\n+");
 
   @override
-  InlineSpan span(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  InlineSpan span(BuildContext context, String text, final GptMarkdownConfig config) {
     return TextSpan(
       text: "\n\n",
       style: TextStyle(
@@ -337,17 +263,10 @@ class HrLine extends BlockMd {
   String get expString => (r"⸻|((--)[-]+)$");
 
   @override
-  Widget build(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  Widget build(BuildContext context, String text, final GptMarkdownConfig config) {
     var thickness = GptMarkdownTheme.of(context).hrLineThickness;
     var color = GptMarkdownTheme.of(context).hrLineColor;
-    return CustomDivider(
-      height: thickness,
-      color: config.style?.color ?? color,
-    );
+    return CustomDivider(height: thickness, color: config.style?.color ?? color);
   }
 }
 
@@ -357,11 +276,7 @@ class CheckBoxMd extends BlockMd {
   String get expString => (r"\[((?:\x|\ ))\]\ (\S[^\n]*?)$");
 
   @override
-  Widget build(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  Widget build(BuildContext context, String text, final GptMarkdownConfig config) {
     var match = this.exp.firstMatch(text.trim());
     return CustomCb(
       value: ("${match?[1]}" == "x"),
@@ -377,11 +292,7 @@ class RadioButtonMd extends BlockMd {
   String get expString => (r"\(((?:\x|\ ))\)\ (\S[^\n]*)$");
 
   @override
-  Widget build(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  Widget build(BuildContext context, String text, final GptMarkdownConfig config) {
     var match = this.exp.firstMatch(text.trim());
     return CustomRb(
       value: ("${match?[1]}" == "x"),
@@ -399,18 +310,10 @@ class BlockQuote extends InlineMd {
   @override
   RegExp get exp =>
   // RegExp(r"(?<=\n\n)(\ +)(.+?)(?=\n\n)", dotAll: true, multiLine: true);
-  RegExp(
-    r"(?:(?:^)\ *>[^\n]+)(?:(?:\n)\ *>[^\n]+)*",
-    dotAll: true,
-    multiLine: true,
-  );
+  RegExp(r"(?:(?:^)\ *>[^\n]+)(?:(?:\n)\ *>[^\n]+)*", dotAll: true, multiLine: true);
 
   @override
-  InlineSpan span(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  InlineSpan span(BuildContext context, String text, final GptMarkdownConfig config) {
     var match = exp.firstMatch(text);
     var dataBuilder = StringBuffer();
     var m = match?[0] ?? '';
@@ -426,9 +329,7 @@ class BlockQuote extends InlineMd {
       }
     }
     var data = dataBuilder.toString().trim();
-    var child = TextSpan(
-      children: MarkdownComponent.generate(context, data, config, true),
-    );
+    var child = TextSpan(children: MarkdownComponent.generate(context, data, config, true));
     return TextSpan(
       children: [
         WidgetSpan(
@@ -459,23 +360,14 @@ class UnOrderedList extends BlockMd {
   String get expString => (r"(?:\-|\*)\ ([^\n]+)$");
 
   @override
-  Widget build(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  Widget build(BuildContext context, String text, final GptMarkdownConfig config) {
     var match = this.exp.firstMatch(text);
 
     var child = MdWidget(context, "${match?[1]?.trim()}", true, config: config);
 
-    return config.unOrderedListBuilder?.call(
-          context,
-          child,
-          config.copyWith(),
-        ) ??
+    return config.unOrderedListBuilder?.call(context, child, config.copyWith()) ??
         UnorderedListView(
-          bulletColor:
-              (config.style?.color ?? DefaultTextStyle.of(context).style.color),
+          bulletColor: (config.style?.color ?? DefaultTextStyle.of(context).style.color),
           padding: 7,
           spacing: 10,
           bulletSize:
@@ -495,28 +387,17 @@ class OrderedList extends BlockMd {
   String get expString => (r"([0-9]+)\.\ ([^\n]+)$");
 
   @override
-  Widget build(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  Widget build(BuildContext context, String text, final GptMarkdownConfig config) {
     var match = this.exp.firstMatch(text);
 
     var no = "${match?[1]}".trim();
 
     var child = MdWidget(context, "${match?[2]}".trim(), true, config: config);
-    return config.orderedListBuilder?.call(
-          context,
-          no,
-          child,
-          config.copyWith(),
-        ) ??
+    return config.orderedListBuilder?.call(context, no, child, config.copyWith()) ??
         OrderedListView(
           no: "$no.",
           textDirection: config.textDirection,
-          style: (config.style ?? const TextStyle()).copyWith(
-            fontWeight: FontWeight.w100,
-          ),
+          style: (config.style ?? const TextStyle()).copyWith(fontWeight: FontWeight.w100),
           child: child,
         );
   }
@@ -527,22 +408,14 @@ class HighlightedText extends InlineMd {
   RegExp get exp => RegExp(r"`(?!`)(.+?)(?<!`)`(?!`)");
 
   @override
-  InlineSpan span(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  InlineSpan span(BuildContext context, String text, final GptMarkdownConfig config) {
     var match = exp.firstMatch(text.trim());
     var codeText = match?[1] ?? "";
 
     if (config.highlightBuilder != null) {
       return WidgetSpan(
         alignment: PlaceholderAlignment.middle,
-        child: config.highlightBuilder!(
-          context,
-          codeText,
-          config.style ?? const TextStyle(),
-        ),
+        child: config.highlightBuilder!(context, codeText, config.style ?? const TextStyle()),
       );
     }
 
@@ -566,12 +439,11 @@ class HighlightedText extends InlineMd {
 
     // Apply search highlighting inside inline code blocks
     if (config.highlightedText != null && config.highlightedText!.isNotEmpty) {
-      final searchQuery = config.caseSensitiveHighlight
-          ? config.highlightedText!
-          : config.highlightedText!.toLowerCase();
-      final searchText = config.caseSensitiveHighlight
-          ? codeText
-          : codeText.toLowerCase();
+      final searchQuery =
+          config.caseSensitiveHighlight
+              ? config.highlightedText!
+              : config.highlightedText!.toLowerCase();
+      final searchText = config.caseSensitiveHighlight ? codeText : codeText.toLowerCase();
 
       if (searchText.contains(searchQuery)) {
         // Build spans with search highlighting
@@ -583,34 +455,33 @@ class HighlightedText extends InlineMd {
         while ((searchIndex = searchText.indexOf(searchQuery, currentIndex)) != -1) {
           // Add text before highlight
           if (searchIndex > currentIndex) {
-            spans.add(TextSpan(
-              text: codeText.substring(currentIndex, searchIndex),
-              style: codeStyle,
-            ));
+            spans.add(
+              TextSpan(text: codeText.substring(currentIndex, searchIndex), style: codeStyle),
+            );
           }
 
           // Add highlighted text with yellow background (same as normal text highlighting)
           // Use codeStyle.copyWith to preserve font size and other properties
-          spans.add(TextSpan(
-            text: codeText.substring(searchIndex, searchIndex + originalQueryLength),
-            style: codeStyle.copyWith(
-              color: Colors.black,
-              background: Paint()
-                ..color = Colors.yellow
-                ..strokeCap = StrokeCap.round
-                ..strokeJoin = StrokeJoin.round,
+          spans.add(
+            TextSpan(
+              text: codeText.substring(searchIndex, searchIndex + originalQueryLength),
+              style: codeStyle.copyWith(
+                color: Colors.black,
+                background:
+                    Paint()
+                      ..color = Colors.yellow
+                      ..strokeCap = StrokeCap.round
+                      ..strokeJoin = StrokeJoin.round,
+              ),
             ),
-          ));
+          );
 
           currentIndex = searchIndex + originalQueryLength;
         }
 
         // Add remaining text
         if (currentIndex < codeText.length) {
-          spans.add(TextSpan(
-            text: codeText.substring(currentIndex),
-            style: codeStyle,
-          ));
+          spans.add(TextSpan(text: codeText.substring(currentIndex), style: codeStyle));
         }
 
         return TextSpan(children: spans);
@@ -627,11 +498,7 @@ class BoldMd extends InlineMd {
   RegExp get exp => RegExp(r"(?<!\*)\*\*(?<!\s)(.+?)(?<!\s)\*\*(?!\*)");
 
   @override
-  InlineSpan span(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  InlineSpan span(BuildContext context, String text, final GptMarkdownConfig config) {
     var match = exp.firstMatch(text.trim());
     var conf = config.copyWith(
       style:
@@ -639,12 +506,7 @@ class BoldMd extends InlineMd {
           const TextStyle(fontWeight: FontWeight.bold),
     );
     return TextSpan(
-      children: MarkdownComponent.generate(
-        context,
-        "${match?[1]}",
-        conf,
-        false,
-      ),
+      children: MarkdownComponent.generate(context, "${match?[1]}", conf, false),
       style: conf.style,
     );
   }
@@ -655,11 +517,7 @@ class StrikeMd extends InlineMd {
   RegExp get exp => RegExp(r"(?<!\*)\~\~(?<!\s)(.+?)(?<!\s)\~\~(?!\*)");
 
   @override
-  InlineSpan span(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  InlineSpan span(BuildContext context, String text, final GptMarkdownConfig config) {
     var match = exp.firstMatch(text.trim());
     var conf = config.copyWith(
       style:
@@ -670,12 +528,7 @@ class StrikeMd extends InlineMd {
           const TextStyle(decoration: TextDecoration.lineThrough),
     );
     return TextSpan(
-      children: MarkdownComponent.generate(
-        context,
-        "${match?[1]}",
-        conf,
-        false,
-      ),
+      children: MarkdownComponent.generate(context, "${match?[1]}", conf, false),
       style: conf.style,
     );
   }
@@ -684,21 +537,14 @@ class StrikeMd extends InlineMd {
 /// Italic text component
 class ItalicMd extends InlineMd {
   @override
-  RegExp get exp =>
-      RegExp(r"(?:(?<!\*)\*(?<!\s)(.+?)(?<!\s)\*(?!\*))", dotAll: true);
+  RegExp get exp => RegExp(r"(?:(?<!\*)\*(?<!\s)(.+?)(?<!\s)\*(?!\*))", dotAll: true);
 
   @override
-  InlineSpan span(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  InlineSpan span(BuildContext context, String text, final GptMarkdownConfig config) {
     var match = exp.firstMatch(text.trim());
     var data = match?[1] ?? match?[2];
     var conf = config.copyWith(
-      style: (config.style ?? const TextStyle()).copyWith(
-        fontStyle: FontStyle.italic,
-      ),
+      style: (config.style ?? const TextStyle()).copyWith(fontStyle: FontStyle.italic),
     );
     return TextSpan(
       children: MarkdownComponent.generate(context, "$data", conf, false),
@@ -710,72 +556,56 @@ class ItalicMd extends InlineMd {
 class LatexMathMultiLine extends BlockMd {
   @override
   String get expString => (r"\ *\\\[((?:.)*?)\\\]|(\ *\\begin.*?\\end{.*?})");
+
   // (r"\ *\\\[((?:(?!\n\n\n).)*?)\\\]|(\\begin.*?\\end{.*?})");
 
   @override
   RegExp get exp => RegExp(expString, dotAll: true, multiLine: true);
 
   @override
-  Widget build(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  Widget build(BuildContext context, String text, final GptMarkdownConfig config) {
     var p0 = exp.firstMatch(text.trim());
     String mathText = p0?[1] ?? p0?[2] ?? '';
     var workaround = config.latexWorkaround ?? (String tex) => tex;
 
     var builder =
         config.latexBuilder ??
-        (BuildContext context, String tex, TextStyle textStyle, bool inline) =>
-            SelectableAdapter(
-              selectedText: tex,
-              child: Math.tex(
-                tex,
-                textStyle: textStyle,
-                mathStyle: MathStyle.display,
-                textScaleFactor: 1,
-                settings: const TexParserSettings(strict: Strict.ignore),
-                options: MathOptions(
-                  sizeUnderTextStyle: MathSize.large,
-                  color:
-                      config.style?.color ??
-                      Theme.of(context).colorScheme.onSurface,
-                  fontSize:
-                      config.style?.fontSize ??
-                      Theme.of(context).textTheme.bodyMedium?.fontSize,
-                  mathFontOptions: FontOptions(
-                    fontFamily: "Main",
-                    fontWeight: config.style?.fontWeight ?? FontWeight.normal,
-                    fontShape: FontStyle.normal,
-                  ),
-                  textFontOptions: FontOptions(
-                    fontFamily: "Main",
-                    fontWeight: config.style?.fontWeight ?? FontWeight.normal,
-                    fontShape: FontStyle.normal,
-                  ),
-                  style: MathStyle.display,
-                ),
-                onErrorFallback: (err) {
-                  return Text(
-                    workaround(mathText),
-                    textDirection: config.textDirection,
-                    style: textStyle.copyWith(
-                      color:
-                          (!kDebugMode)
-                              ? null
-                              : Theme.of(context).colorScheme.error,
-                    ),
-                  );
-                },
+        (BuildContext context, String tex, TextStyle textStyle, bool inline) => SelectableAdapter(
+          selectedText: tex,
+          child: Math.tex(
+            tex,
+            textStyle: textStyle,
+            mathStyle: MathStyle.display,
+            textScaleFactor: 1,
+            settings: const TexParserSettings(strict: Strict.ignore),
+            options: MathOptions(
+              sizeUnderTextStyle: MathSize.large,
+              color: config.style?.color ?? Theme.of(context).colorScheme.onSurface,
+              fontSize: config.style?.fontSize ?? Theme.of(context).textTheme.bodyMedium?.fontSize,
+              mathFontOptions: FontOptions(
+                fontFamily: "Main",
+                fontWeight: config.style?.fontWeight ?? FontWeight.normal,
+                fontShape: FontStyle.normal,
               ),
-            );
-    return builder(
-      context,
-      workaround(mathText),
-      config.style ?? const TextStyle(),
-      false,
-    );
+              textFontOptions: FontOptions(
+                fontFamily: "Main",
+                fontWeight: config.style?.fontWeight ?? FontWeight.normal,
+                fontShape: FontStyle.normal,
+              ),
+              style: MathStyle.display,
+            ),
+            onErrorFallback: (err) {
+              return Text(
+                workaround(mathText),
+                textDirection: config.textDirection,
+                style: textStyle.copyWith(
+                  color: (!kDebugMode) ? null : Theme.of(context).colorScheme.error,
+                ),
+              );
+            },
+          ),
+        );
+    return builder(context, workaround(mathText), config.style ?? const TextStyle(), false);
   }
 }
 
@@ -791,69 +621,52 @@ class LatexMath extends InlineMd {
   );
 
   @override
-  InlineSpan span(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  InlineSpan span(BuildContext context, String text, final GptMarkdownConfig config) {
     var p0 = exp.firstMatch(text.trim());
     p0?.group(0);
     String mathText = p0?[1]?.toString() ?? "";
     var workaround = config.latexWorkaround ?? (String tex) => tex;
     var builder =
         config.latexBuilder ??
-        (BuildContext context, String tex, TextStyle textStyle, bool inline) =>
-            SelectableAdapter(
-              selectedText: tex,
-              child: Math.tex(
-                tex,
-                textStyle: textStyle,
-                mathStyle: MathStyle.display,
-                textScaleFactor: 1,
-                settings: const TexParserSettings(strict: Strict.ignore),
-                options: MathOptions(
-                  sizeUnderTextStyle: MathSize.large,
-                  color:
-                      config.style?.color ??
-                      Theme.of(context).colorScheme.onSurface,
-                  fontSize:
-                      config.style?.fontSize ??
-                      Theme.of(context).textTheme.bodyMedium?.fontSize,
-                  mathFontOptions: FontOptions(
-                    fontFamily: "Main",
-                    fontWeight: config.style?.fontWeight ?? FontWeight.normal,
-                    fontShape: FontStyle.normal,
-                  ),
-                  textFontOptions: FontOptions(
-                    fontFamily: "Main",
-                    fontWeight: config.style?.fontWeight ?? FontWeight.normal,
-                    fontShape: FontStyle.normal,
-                  ),
-                  style: MathStyle.display,
-                ),
-                onErrorFallback: (err) {
-                  return Text(
-                    workaround(mathText),
-                    textDirection: config.textDirection,
-                    style: textStyle.copyWith(
-                      color:
-                          (!kDebugMode)
-                              ? null
-                              : Theme.of(context).colorScheme.error,
-                    ),
-                  );
-                },
+        (BuildContext context, String tex, TextStyle textStyle, bool inline) => SelectableAdapter(
+          selectedText: tex,
+          child: Math.tex(
+            tex,
+            textStyle: textStyle,
+            mathStyle: MathStyle.display,
+            textScaleFactor: 1,
+            settings: const TexParserSettings(strict: Strict.ignore),
+            options: MathOptions(
+              sizeUnderTextStyle: MathSize.large,
+              color: config.style?.color ?? Theme.of(context).colorScheme.onSurface,
+              fontSize: config.style?.fontSize ?? Theme.of(context).textTheme.bodyMedium?.fontSize,
+              mathFontOptions: FontOptions(
+                fontFamily: "Main",
+                fontWeight: config.style?.fontWeight ?? FontWeight.normal,
+                fontShape: FontStyle.normal,
               ),
-            );
+              textFontOptions: FontOptions(
+                fontFamily: "Main",
+                fontWeight: config.style?.fontWeight ?? FontWeight.normal,
+                fontShape: FontStyle.normal,
+              ),
+              style: MathStyle.display,
+            ),
+            onErrorFallback: (err) {
+              return Text(
+                workaround(mathText),
+                textDirection: config.textDirection,
+                style: textStyle.copyWith(
+                  color: (!kDebugMode) ? null : Theme.of(context).colorScheme.error,
+                ),
+              );
+            },
+          ),
+        );
     return WidgetSpan(
       alignment: PlaceholderAlignment.baseline,
       baseline: TextBaseline.alphabetic,
-      child: builder(
-        context,
-        workaround(mathText),
-        config.style ?? const TextStyle(),
-        true,
-      ),
+      child: builder(context, workaround(mathText), config.style ?? const TextStyle(), true),
     );
   }
 }
@@ -864,11 +677,7 @@ class SourceTag extends InlineMd {
   RegExp get exp => RegExp(r"(?:【.*?)?\[(\d+?)\]");
 
   @override
-  InlineSpan span(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  InlineSpan span(BuildContext context, String text, final GptMarkdownConfig config) {
     var match = exp.firstMatch(text.trim());
     var content = match?[1];
     if (content == null) {
@@ -879,11 +688,7 @@ class SourceTag extends InlineMd {
       child: Padding(
         padding: const EdgeInsets.all(2),
         child:
-            config.sourceTagBuilder?.call(
-              context,
-              content,
-              const TextStyle(),
-            ) ??
+            config.sourceTagBuilder?.call(context, content, const TextStyle()) ??
             SizedBox(
               width: 20,
               height: 20,
@@ -911,11 +716,7 @@ class ATagMd extends InlineMd {
   RegExp get exp => RegExp(r"(?<!\!)\[.*\]\([^\s]*\)");
 
   @override
-  InlineSpan span(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  InlineSpan span(BuildContext context, String text, final GptMarkdownConfig config) {
     var bracketCount = 0;
     var start = 1;
     var end = 0;
@@ -975,19 +776,11 @@ class ATagMd extends InlineMd {
 
     var ending = text.substring(urlEnd + 1);
 
-    var endingSpans = MarkdownComponent.generate(
-      context,
-      ending,
-      config,
-      false,
-    );
+    var endingSpans = MarkdownComponent.generate(context, ending, config, false);
     var theme = GptMarkdownTheme.of(context);
     var linkTextSpan = TextSpan(
       children: MarkdownComponent.generate(context, linkText, config, false),
-      style: config.style?.copyWith(
-        color: theme.linkColor,
-        decorationColor: theme.linkColor,
-      ),
+      style: config.style?.copyWith(color: theme.linkColor, decorationColor: theme.linkColor),
     );
 
     // Use custom builder if provided
@@ -998,12 +791,7 @@ class ATagMd extends InlineMd {
         alignment: PlaceholderAlignment.baseline,
         child: GestureDetector(
           onTap: () => config.onLinkTap?.call(url, linkText),
-          child: builder(
-            context,
-            linkTextSpan,
-            url,
-            config.style ?? const TextStyle(),
-          ),
+          child: builder(context, linkTextSpan, url, config.style ?? const TextStyle()),
         ),
       );
     }
@@ -1034,11 +822,7 @@ class ImageMd extends InlineMd {
   RegExp get exp => RegExp(r"\!\[[^\[\]]*\]\([^\s]*\)");
 
   @override
-  InlineSpan span(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  InlineSpan span(BuildContext context, String text, final GptMarkdownConfig config) {
     // First try to find the basic pattern
     final basicMatch = RegExp(r'\!\[([^\[\]]*)\]\(').firstMatch(text.trim());
     if (basicMatch == null) {
@@ -1092,19 +876,14 @@ class ImageMd extends InlineMd {
         height: height,
         child: Image(
           image: NetworkImage(url),
-          loadingBuilder: (
-            BuildContext context,
-            Widget child,
-            ImageChunkEvent? loadingProgress,
-          ) {
+          loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
             if (loadingProgress == null) {
               return child;
             }
             return CustomImageLoading(
               progress:
                   loadingProgress.expectedTotalBytes != null
-                      ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
+                      ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
                       : 1,
             );
           },
@@ -1126,22 +905,12 @@ class TableMd extends BlockMd {
       (r"(((\|[^\n\|]+\|)((([^\n\|]+\|)+)?)\ *)(\n\ *(((\|[^\n\|]+\|)(([^\n\|]+\|)+)?))\ *)+)$");
 
   @override
-  Widget build(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  Widget build(BuildContext context, String text, final GptMarkdownConfig config) {
     final List<Map<int, String>> value =
         text
             .split('\n')
             .map<Map<int, String>>(
-              (e) =>
-                  e
-                      .trim()
-                      .split('|')
-                      .where((element) => element.isNotEmpty)
-                      .toList()
-                      .asMap(),
+              (e) => e.trim().split('|').where((element) => element.isNotEmpty).toList().asMap(),
             )
             .toList();
 
@@ -1203,19 +972,11 @@ class TableMd extends BlockMd {
             }
             var fields = List<CustomTableField>.generate(maxCol, (index) {
               var field = row[index];
-              return CustomTableField(
-                data: field ?? "",
-                alignment: columnAlignments[index],
-              );
+              return CustomTableField(data: field ?? "", alignment: columnAlignments[index]);
             });
             return CustomTableRow(isHeader: isHeader, fields: fields);
           }).nonNulls.toList();
-      return tableBuilder(
-        context,
-        customTable,
-        config.style ?? const TextStyle(),
-        config,
-      );
+      return tableBuilder(context, customTable, config.style ?? const TextStyle(), config);
     }
 
     final controller = ScrollController();
@@ -1228,10 +989,7 @@ class TableMd extends BlockMd {
           textDirection: config.textDirection,
           defaultColumnWidth: CustomTableColumnWidth(),
           defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-          border: TableBorder.all(
-            width: 1,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
+          border: TableBorder.all(width: 1, color: Theme.of(context).colorScheme.onSurface),
           children:
               value
                   .asMap()
@@ -1248,32 +1006,20 @@ class TableMd extends BlockMd {
                       decoration:
                           (hasHeader && entry.key == 0)
                               ? BoxDecoration(
-                                color:
-                                    Theme.of(
-                                      context,
-                                    ).colorScheme.surfaceContainerHighest,
+                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                               )
                               : null,
                       children: List.generate(maxCol, (index) {
                         var e = entry.value;
                         String data = e[index] ?? "";
-                        if (RegExp(r"^:?--+:?$").hasMatch(data.trim()) ||
-                            data.trim().isEmpty) {
+                        if (RegExp(r"^:?--+:?$").hasMatch(data.trim()) || data.trim().isEmpty) {
                           return const SizedBox();
                         }
 
                         // Apply alignment based on column alignment
                         Widget content = Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          child: MdWidget(
-                            context,
-                            (e[index] ?? "").trim(),
-                            false,
-                            config: config,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          child: MdWidget(context, (e[index] ?? "").trim(), false, config: config),
                         );
 
                         // Wrap with alignment widget
@@ -1282,17 +1028,11 @@ class TableMd extends BlockMd {
                             content = Center(child: content);
                             break;
                           case TextAlign.right:
-                            content = Align(
-                              alignment: Alignment.centerRight,
-                              child: content,
-                            );
+                            content = Align(alignment: Alignment.centerRight, child: content);
                             break;
                           case TextAlign.left:
                           default:
-                            content = Align(
-                              alignment: Alignment.centerLeft,
-                              child: content,
-                            );
+                            content = Align(alignment: Alignment.centerLeft, child: content);
                             break;
                         }
 
@@ -1312,11 +1052,7 @@ class CodeBlockMd extends BlockMd {
   String get expString => r"```(.*?)\n((.*?)(:?\n\s*?```)|(.*)(:?\n```)?)$";
 
   @override
-  Widget build(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  Widget build(BuildContext context, String text, final GptMarkdownConfig config) {
     String codes = this.exp.firstMatch(text)?[2] ?? "";
     String name = this.exp.firstMatch(text)?[1] ?? "";
     codes = codes.replaceAll(r"```", "");
@@ -1329,15 +1065,10 @@ class CodeBlockMd extends BlockMd {
 
 class UnderLineMd extends InlineMd {
   @override
-  RegExp get exp =>
-      RegExp(r"<u>(.*?)(?:</u>|$)", multiLine: true, dotAll: true);
+  RegExp get exp => RegExp(r"<u>(.*?)(?:</u>|$)", multiLine: true, dotAll: true);
 
   @override
-  InlineSpan span(
-    BuildContext context,
-    String text,
-    final GptMarkdownConfig config,
-  ) {
+  InlineSpan span(BuildContext context, String text, final GptMarkdownConfig config) {
     var match = exp.firstMatch(text.trim());
     var conf = config.copyWith(
       style: (config.style ?? const TextStyle()).copyWith(
@@ -1346,12 +1077,7 @@ class UnderLineMd extends InlineMd {
       ),
     );
     return TextSpan(
-      children: MarkdownComponent.generate(
-        context,
-        "${match?[1]}",
-        conf,
-        false,
-      ),
+      children: MarkdownComponent.generate(context, "${match?[1]}", conf, false),
       style: conf.style,
     );
   }
